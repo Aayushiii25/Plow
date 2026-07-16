@@ -33,13 +33,11 @@ struct FileBuffer {
 
     std::string ReadString() {
         int len = ReadInt();
-        std::string ret = "";
-        char *v = new char[len + 5];
-        v[len] = 0;
-        if (fread(v, 1, len, f) != len) {
+        std::string ret(len, '\0');
+        if (len > 0 && fread(&ret[0], 1, len, f) != (size_t)len) {
             std::cout << "FileBuffer.ReadString error." << "\n";
         }
-        return v;
+        return ret;
     }
 
     void ReadBytes(uint8_t *buffer, uint64_t bytes) {
@@ -102,6 +100,9 @@ struct Tokenizer {
 //         std::unique_ptr<sentencepiece::SentencePieceProcessor> spProcessor;
 // #endif
 
+    int bos_token_id_ = 1;
+    int eos_token_id_ = 2;
+
     Tokenizer() {
         root = new TrieNode();
     }
@@ -133,37 +134,55 @@ struct Tokenizer {
         tokenToStringDict[tokenId] = s;
         stringToTokenDict[s] = tokenId;
     }
-    //对应于torch2flm.py
+    //对应于torch2flm.py 或 export_tokenizer.py (ISPT format)
     void Initialize(std::string file){
-        FileBuffer buffer(file);//这里的filename就是读取的weight文件，读了这个之后才能用tokenizer
-        int versionId = buffer.ReadInt();
-
-        if (versionId >= 1) {
-            // versionId >= 1, 前置了一个key-value表
-            int keyValueLen = buffer.ReadInt();
-            for (int i = 0; i < keyValueLen; i++) {
-                std::string key = buffer.ReadString();
-                std::string value = buffer.ReadString();
-                // printf("key = %s, value = %s\n", key.c_str(), value.c_str());
-                // this->dicts[key] = value;
+        FileBuffer buffer(file);
+        
+        // Check for new ISPT format (magic = "ISPT")
+        int first_int = buffer.ReadInt();
+        
+        // ISPT magic is 0x54505349 in little-endian ('I','S','P','T')
+        if (first_int == 0x54505349) {
+            // New ISPT format from export_tokenizer.py
+            int vocabLen = buffer.ReadInt();
+            bos_token_id_ = buffer.ReadInt();
+            eos_token_id_ = buffer.ReadInt();
+            
+            for (int i = 0; i < vocabLen; i++) {
+                std::string piece = buffer.ReadString();
+                float score = buffer.ReadFloat();
+                Insert(piece, i, score);
             }
-        }
-
-        // tokenizer vocab
-        // bool useScore = this->dicts["tokenizer_use_score"] == "1";
-        int vocabLen = buffer.ReadInt();
-        for (int i = 0; i < vocabLen; i++) {
-            int len = buffer.ReadInt();
-            std::string x = "";
-            for (int j = 0; j < len; j++) {
-                x += buffer.ReadInt(); //encode内容，对应torch2flm.py#160
+            std::cout << "[InferSpore] Loaded ISPT tokenizer: vocab=" << vocabLen 
+                      << ", bos=" << bos_token_id_ << ", eos=" << eos_token_id_ << std::endl;
+        } else {
+            // Legacy FLM format: first_int is versionId
+            int versionId = first_int;
+            if (versionId >= 1) {
+                int keyValueLen = buffer.ReadInt();
+                for (int i = 0; i < keyValueLen; i++) {
+                    std::string key = buffer.ReadString();
+                    std::string value = buffer.ReadString();
+                }
             }
-            int id = buffer.ReadInt();
-            // float score = useScore ? buffer.ReadFloat() : -i;
-            float score = buffer.ReadFloat();
-            Insert(x, id, score);
+
+            int vocabLen = buffer.ReadInt();
+            for (int i = 0; i < vocabLen; i++) {
+                int len = buffer.ReadInt();
+                std::string x = "";
+                for (int j = 0; j < len; j++) {
+                    x += buffer.ReadInt();
+                }
+                int id = buffer.ReadInt();
+                float score = buffer.ReadFloat();
+                Insert(x, id, score);
+            }
+            std::cout << "[InferSpore] Loaded legacy tokenizer: vocab=" << vocabLen << std::endl;
         }
     }
+    
+    int getBosTokenId() const { return bos_token_id_; }
+    int getEosTokenId() const { return eos_token_id_; }
     void TryMergePairs(std::vector<Symbol> &symbols, int l, int r, std::priority_queue <SymbolPairs> &q) {
         if (l == -1 || r == -1 || symbols[l].len == 0 || symbols[r].len == 0) {
             return;

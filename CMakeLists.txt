@@ -99,3 +99,11 @@ add_library(llmengine OBJECT
 add_subdirectory(src)
 add_subdirectory(tests)
 # add_subdirectory(examples)
+
+add_executable(inferspore_cli src/main.cpp)
+target_link_libraries(inferspore_cli 
+    PRIVATE 
+    $<TARGET_OBJECTS:llmengine>
+    cublas
+    cudart
+)
