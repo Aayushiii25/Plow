@@ -12,7 +12,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'system',
-      content: 'Welcome to **plow**. High-performance, pure C++ inference engine initialized. Waiting for prompt...',
+      content: 'Welcome to **plow**. High-performance Rust inference engine initialized. Waiting for prompt...',
     },
   ]);
   const [prompt, setPrompt] = useState('');
