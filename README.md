@@ -78,5 +78,16 @@ To run larger models on constrained hardware, you can quantize them to 4-bit rep
 ./target/release/plow quantize --input ./model.safetensors --output ./model-q4.safetensors --scheme q4_k
 ```
 
+### 4. Run the Web Interface (Demo)
+A beautiful, glassmorphism Next.js web interface is included for live demonstrations. It directly streams tokens from the C++ inference engine using Server-Sent Events (SSE).
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+Navigate to `http://localhost:3000` to interact with the model.
+
 ## License
 MIT License.
+
