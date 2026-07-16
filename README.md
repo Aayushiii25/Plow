@@ -1,5 +1,7 @@
 # plow
 
+![Plow Web UI Demo](assets/demo.png)
+
 A fast, lightweight, and highly portable Large Language Model (LLM) inference engine built entirely from scratch in Rust. It runs advanced transformer models locally on consumer hardware—completely bypassing heavy Python environments, PyTorch dependencies, and opaque third-party C++ runtimes.
 
 ## Why I Built This
